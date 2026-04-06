@@ -31,6 +31,7 @@
   <!-- Supabase config — set these to your project values -->
   <script>
     window.SUPABASE_URL = 'https://zqqzkrqjyjqhjbcvtzrg.supabase.co';
+    window.ANTHROPIC_API_KEY = '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';
     window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxcXprcnFqeWpxaGpiY3Z0enJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3ODAsImV4cCI6MjA5MTAxNjc4MH0.o7Bph6LJsMV84yJFUpT2D0oMkKXHnWFIij7aGWPNsUM';
   </script>
 </head>
@@ -1054,6 +1055,7 @@ Rules:
         headers: {
           "Content-Type": "application/json",
           "anthropic-dangerous-direct-browser-access": "true",
+          "x-api-key": window.ANTHROPIC_API_KEY,
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",

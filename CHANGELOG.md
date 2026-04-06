@@ -1,5 +1,9 @@
 # Nurse Visit Sheet — Changelog
 
+## v1.1 — April 2026
+- Fixed: Added Anthropic API key (`x-api-key` header) to AI narrative fetch call
+- Fixed: API key and Supabase credentials baked into index.html for deployed environment
+
 ## v1.0 — April 2026
 - Initial release
 - AI narrative intake with Claude API + local keyword parser fallback
