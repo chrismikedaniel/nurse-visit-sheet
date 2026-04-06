@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f3460" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Nurse Visit" />
+  <title>Nurse Visit Sheet — All About Childcare Health</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body, #root { margin: 0; padding: 0; min-height: 100%; }
+    body {
+      font-family: 'DM Sans', 'Segoe UI', sans-serif;
+      background: #0d1b2a;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overscroll-behavior: none;
+    }
+    input, textarea, button, select { font-family: inherit; }
+    /* iOS safe area */
+    #root { padding-bottom: env(safe-area-inset-bottom); }
+  </style>
+
+  <!-- Supabase config — set these to your project values -->
+  <script>
+    window.SUPABASE_URL = 'https://zqqzkrqjyjqhjbcvtzrg.supabase.co';
+    window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxcXprcnFqeWpxaGpiY3Z0enJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NDA3ODAsImV4cCI6MjA5MTAxNjc4MH0.o7Bph6LJsMV84yJFUpT2D0oMkKXHnWFIij7aGWPNsUM';
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel (standalone, no build step needed) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useRef } = React;
+
+
+// ── Supabase save ─────────────────────────────────────────────────────────────
+async function saveVisitToSupabase(formData, checklistData) {
+  const url = window.SUPABASE_URL;
+  const key = window.SUPABASE_ANON_KEY;
+  if (!url || !key) return;
+  try {
+    await fetch(url + '/rest/v1/visits', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': key,
+        'Authorization': 'Bearer ' + key,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        center_name: formData.centerName || '',
+        visit_date: formData.date || null,
+        visit_time: formData.time || null,
+        met_director: !!formData.metWithDirector,
+        visited_rooms: !!formData.visitOpenRooms,
+        education_newsletter: !!formData.educationNewsletter,
+        notes: formData.notes || '',
+        imm_infant: formData.imm_infant || null,
+        imm_toddler: formData.imm_toddler || null,
+        imm_over18: formData.imm_over18 || null,
+        imm_mixed: formData.imm_mixed || null,
+        imm_letters: !!formData.imm_letters,
+        checklist: checklistData,
+      })
+    });
+  } catch(e) { console.warn('Supabase save failed:', e); }
+}
+
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+const SECTIONS = [
+  {
+    id: "header",
+    title: "Visit Info",
+    icon: "🏥",
+    type: "header",
+    fields: [
+      { id: "centerName", label: "Center Name", type: "text" },
+      { id: "time", label: "Time", type: "time" },
+      { id: "date", label: "Date", type: "date" },
+      { id: "metWithDirector", label: "Met with Director", type: "checkbox" },
+      { id: "visitOpenRooms", label: "Visit open rooms", type: "checkbox" },
+      { id: "educationNewsletter", label: "Provide education newsletter on", type: "checkbox" },
+      { id: "notes", label: "Visit Notes", type: "textarea" },
+    ],
+  },
+  {
+    id: "handwashing",
+    title: "Hand Washing",
+    icon: "🧼",
+    type: "checklist",
+    code: "407.320",
+    items: [
+      { id: "hw_technique", label: "Technique: Thoroughly wash ~20 seconds with warm water and soap, rinse, dry without re-contaminating hands from faucet" },
+      { id: "hw_frequency", label: "Frequency: Upon arrival; before & after meals/snacks; before preparing food or dispensing medication; after outdoor play; contact with a sick child; following/diapering/toileting; touching any body fluid/waste/pets", code: "407.320" },
+      { id: "hw_supplies", label: "Supplies: Hand washing sink without barriers, soap, disposable towels", code: "407.840/407.370" },
+    ],
+  },
+  {
+    id: "diaper",
+    title: "Diaper Changing",
+    icon: "👶",
+    type: "checklist",
+    code: "407.840",
+    items: [
+      { id: "dc_supplies", label: "Assemble supplies: Diaper, wipes, skin preparations as ordered, cleaning supplies" },
+      { id: "dc_impervious", label: "Child safe on impervious surface" },
+      { id: "dc_gloves", label: "Use of latex or other medical-quality gloves" },
+      { id: "dc_discard", label: "Remove and discard soiled diaper & gloves in covered container" },
+      { id: "dc_wash", label: "Wash hands of child and provider" },
+      { id: "dc_sanitize", label: "Clean and sanitize surface" },
+      { id: "dc_posted", label: "Procedure posted" },
+    ],
+  },
+  {
+    id: "discipline",
+    title: "Discipline",
+    icon: "🤝",
+    type: "checklist",
+    code: "407.270",
+    items: [
+      { id: "disc_positive", label: "Guidance positive & developmentally appropriate" },
+      { id: "disc_noprohibited", label: "NO prohibited techniques (physical punishment, abusive language, humiliation, shaming, emotional abuse) used" },
+    ],
+  },
+  {
+    id: "medication",
+    title: "Medication Administration",
+    icon: "💊",
+    type: "checklist",
+    code: "407.960/407.370",
+    items: [
+      { id: "med_policy", label: "Medication policy present" },
+      { id: "med_locked", label: "Medications locked/inaccessible to children" },
+      { id: "med_labeled", label: "Medication properly labeled" },
+      { id: "med_expiration", label: "Not past expiration date" },
+      { id: "med_log", label: "Documented in medication log" },
+      { id: "med_permission", label: "Parent permission present" },
+    ],
+  },
+  {
+    id: "infant",
+    title: "Infant Feeding",
+    icon: "🍼",
+    type: "checklist",
+    code: "407.210",
+    items: [
+      { id: "if_labeled", label: "All bottles labeled, dated and covered" },
+      { id: "if_nomicrowave", label: "No microwave heating" },
+      { id: "if_nopropping", label: "No propping bottles" },
+    ],
+  },
+  {
+    id: "food",
+    title: "Food",
+    icon: "🥗",
+    type: "checklist",
+    code: "407.210/407.330",
+    items: [
+      { id: "food_servings", label: "Age appropriate servings" },
+      { id: "food_choking", label: "Choking prevention" },
+      { id: "food_nutrition", label: "Follows nutrition guidelines" },
+    ],
+  },
+  {
+    id: "safety",
+    title: "General Safety",
+    icon: "🛡️",
+    type: "checklist",
+    code: "407.90/407.370",
+    items: [
+      { id: "gs_supervision", label: "Adequate supervision" },
+      { id: "gs_cleanliness", label: "General cleanliness and safety" },
+    ],
+  },
+  {
+    id: "sleep",
+    title: "Safe Sleep",
+    icon: "😴",
+    type: "checklist",
+    code: "407.350",
+    items: [
+      { id: "ss_spacing", label: "2+ feet between cribs" },
+      { id: "ss_mattress", label: "Cribs have tight mattress, not drop sided" },
+      { id: "ss_cribonly", label: "Crib sleep only — no sleeping in swings, seats, car seats, etc." },
+      { id: "ss_back", label: "Infants: Back to sleep" },
+      { id: "ss_nothing", label: "Nothing in crib except baby, crib sheet (& possibly pacifier)" },
+      { id: "ss_observed", label: "Can be observed by staff in room" },
+    ],
+  },
+  {
+    id: "playground",
+    title: "Playground Safety",
+    icon: "🛝",
+    type: "checklist",
+    code: "407.300",
+    items: [
+      { id: "pg_clean", label: "Clean" },
+      { id: "pg_surface", label: "Suitable surface and equipment" },
+      { id: "pg_maintained", label: "Maintained" },
+      { id: "pg_sandbox", label: "Sandbox covered when not in use" },
+    ],
+  },
+  {
+    id: "toys",
+    title: "Toy Sanitation",
+    icon: "🧸",
+    type: "checklist",
+    code: "407.370",
+    items: [
+      { id: "toy_mouthed", label: "Mouthed toys are cleaned after each child" },
+    ],
+  },
+  {
+    id: "emergency",
+    title: "Emergency Preparation",
+    icon: "🚨",
+    type: "checklist",
+    code: "Checked at least annually",
+    items: [
+      { id: "em_action", label: "Action plans for children with allergies/special needs", code: "407.310" },
+      { id: "em_phone", label: "Emergency phone numbers available", code: "407.310" },
+      { id: "em_evacuation", label: "Evacuation plan posted", code: "407.310" },
+      { id: "em_firstaid", label: "First aid box available, properly stocked", code: "407.380" },
+      { id: "em_poison", label: "Poison control and 911 numbers listed by phone", code: "407.380" },
+      { id: "em_choking", label: "First aid/choking post displayed", code: "407.380" },
+      { id: "em_isolation", label: "Isolation area for ill child", code: "407.310" },
+    ],
+  },
+  {
+    id: "immunization",
+    title: "Immunization / Health Files",
+    icon: "📋",
+    type: "immunization",
+    fields: [
+      { id: "imm_infant", label: "# Infant files reviewed", type: "number" },
+      { id: "imm_toddler", label: "# Toddler files reviewed", type: "number" },
+      { id: "imm_over18", label: "# Over 18 months files reviewed", type: "number" },
+      { id: "imm_mixed", label: "# Mixed files reviewed", type: "number" },
+      { id: "imm_letters", label: "Letters to parents regarding any omissions provided for distribution", type: "checkbox" },
+    ],
+  },
+];
+
+const STATUS_OPTIONS = [
+  { value: "direct", label: "Direct", color: "#0f766e", bg: "#ccfbf1", border: "#0f766e" },
+  { value: "evidence", label: "Evidence", color: "#1d4ed8", bg: "#dbeafe", border: "#1d4ed8" },
+  { value: "not_observed", label: "Not Observed", color: "#b45309", bg: "#fef3c7", border: "#b45309" },
+  { value: "na", label: "N/A", color: "#6b7280", bg: "#f3f4f6", border: "#9ca3af" },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function cycleStatus(current) {
+  const vals = [null, "direct", "evidence", "not_observed", "na"];
+  const idx = vals.indexOf(current);
+  return vals[(idx + 1) % vals.length];
+}
+
+function getStatusStyle(value) {
+  const opt = STATUS_OPTIONS.find((o) => o.value === value);
+  if (!opt) return { background: "#f9fafb", border: "1.5px solid #e5e7eb", color: "#9ca3af" };
+  return { background: opt.bg, border: `1.5px solid ${opt.border}`, color: opt.color };
+}
+
+function getStatusLabel(value) {
+  const opt = STATUS_OPTIONS.find((o) => o.value === value);
+  return opt ? opt.label : "Tap to set";
+}
+
+// ── PDF Generator ─────────────────────────────────────────────────────────────
+function generatePDF(formData, checklistData) {
+  const statusLabel = (v) => {
+    if (!v) return "—";
+    return { direct: "Direct Observation", evidence: "Evidence Observed", not_observed: "Not Observed Today", na: "Not Applicable" }[v] || "—";
+  };
+
+  const dateStr = formData.date
+    ? new Date(formData.date + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    : "";
+
+  const checkboxChar = (val) => (val ? "☑" : "☐");
+
+  let checklistRows = "";
+  SECTIONS.filter((s) => s.type === "checklist").forEach((section) => {
+    checklistRows += `
+      <tr class="section-header">
+        <td colspan="3"><strong>${section.title}</strong> <span class="code">${section.code || ""}</span></td>
+      </tr>`;
+    section.items.forEach((item) => {
+      const val = checklistData[item.id];
+      const style = val
+        ? { direct: "status-direct", evidence: "status-evidence", not_observed: "status-notobs", na: "status-na" }[val]
+        : "";
+      checklistRows += `
+        <tr>
+          <td class="item-label">${item.label}${item.code ? ` <span class="code">${item.code}</span>` : ""}</td>
+          <td class="status-cell ${style}">${statusLabel(val)}</td>
+          <td class="comments-cell"></td>
+        </tr>`;
+    });
+  });
+
+  const imm = formData;
+  const immunRow = `
+    <tr class="section-header">
+      <td colspan="3"><strong>Immunization / Health Files</strong></td>
+    </tr>
+    <tr>
+      <td class="item-label">
+        Infant: <strong>${imm.imm_infant || "—"}</strong> &nbsp;|&nbsp; Toddler: <strong>${imm.imm_toddler || "—"}</strong> &nbsp;|&nbsp; Over 18 months: <strong>${imm.imm_over18 || "—"}</strong> &nbsp;|&nbsp; Mixed: <strong>${imm.imm_mixed || "—"}</strong><br/>
+        ${checkboxChar(imm.imm_letters)} Letters to parents regarding any omissions provided for distribution
+      </td>
+      <td class="status-cell"></td>
+      <td class="comments-cell"></td>
+    </tr>`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Nurse Visit Sheet — ${formData.centerName || "All About Childcare Health"}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Source Sans 3', sans-serif; font-size: 9.5pt; color: #1a1a2e; }
+  @page { size: letter; margin: 0.55in 0.5in; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+  /* PAGE 1 */
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+
+  .masthead { background: #0f3460; color: white; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px 4px 0 0; }
+  .masthead h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.02em; }
+  .masthead h2 { font-size: 10pt; font-weight: 400; letter-spacing: 0.12em; opacity: 0.85; }
+  .masthead-right { text-align: right; font-size: 8.5pt; }
+  .masthead-right .val { font-size: 11pt; font-weight: 700; margin-top: 2px; }
+
+  .info-grid { border: 1px solid #cbd5e1; border-top: none; }
+  .info-row { display: flex; border-bottom: 1px solid #e2e8f0; }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { width: 200px; min-width: 200px; padding: 6px 10px; font-weight: 600; background: #f8fafc; border-right: 1px solid #e2e8f0; font-size: 8.5pt; color: #334155; }
+  .info-value { flex: 1; padding: 6px 10px; font-size: 9pt; color: #1e293b; }
+
+  .notes-box { border: 1px solid #cbd5e1; border-top: none; min-height: 380px; padding: 10px; font-size: 9pt; color: #334155; white-space: pre-wrap; }
+  .notes-label { font-size: 7.5pt; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+
+  /* PAGE 2 */
+  .checklist-masthead { background: #0f3460; color: white; padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px 4px 0 0; font-size: 9pt; }
+  .checklist-masthead span { opacity: 0.8; font-size: 8pt; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; border: 1px solid #cbd5e1; border-top: none; }
+  th { background: #1e3a5f; color: white; padding: 5px 8px; text-align: left; font-weight: 600; letter-spacing: 0.04em; font-size: 8pt; }
+  th.w-status { width: 130px; }
+  th.w-comments { width: 110px; }
+  tr.section-header td { background: #e8f0fe; padding: 4px 8px; font-size: 8pt; color: #1e3a5f; border-bottom: 1px solid #bfcfea; }
+  tr.section-header .code { color: #64748b; font-size: 7.5pt; font-weight: 400; margin-left: 6px; }
+  td { padding: 4px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  td.item-label { color: #374151; line-height: 1.4; }
+  td.item-label .code { color: #94a3b8; font-size: 7pt; margin-left: 4px; }
+  td.status-cell { font-size: 7.5pt; font-weight: 600; text-align: center; vertical-align: middle; }
+  td.comments-cell { }
+
+  .status-direct { background: #d1fae5; color: #065f46; }
+  .status-evidence { background: #dbeafe; color: #1e40af; }
+  .status-notobs { background: #fef3c7; color: #92400e; }
+  .status-na { background: #f3f4f6; color: #6b7280; }
+
+  .footer { margin-top: 6px; font-size: 7pt; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: HEADER -->
+<div class="page">
+  <div class="masthead">
+    <div>
+      <h1>All About Childcare Health, LTD</h1>
+      <h2>NURSE VISIT SHEET</h2>
+    </div>
+    <div class="masthead-right">
+      <div style="opacity:0.7">Time &nbsp;/&nbsp; Date</div>
+      <div class="val">${formData.time || "—"} &nbsp; ${dateStr || "—"}</div>
+      <div style="margin-top:6px; font-size:7.5pt; opacity:0.65">Completed &nbsp;|&nbsp; Carry Over</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-row">
+      <div class="info-label">Center Name</div>
+      <div class="info-value">${formData.centerName || ""}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Met with Director</div>
+      <div class="info-value">${formData.metWithDirector ? "Yes" : "No"}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Visit open rooms</div>
+      <div class="info-value">${formData.visitOpenRooms ? "Yes" : "No"}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-label">Provide education newsletter on</div>
+      <div class="info-value">${formData.educationNewsletter ? "Yes" : "No"}</div>
+    </div>
+  </div>
+
+  <div class="notes-box">
+    <div class="notes-label">Visit Notes</div>
+    ${formData.notes || ""}
+  </div>
+</div>
+
+<!-- PAGE 2: CHECKLIST -->
+<div class="page">
+  <div class="checklist-masthead">
+    <strong>All About Childcare Health, LTD — NURSE VISIT SHEET</strong>
+    <span>${formData.centerName || ""} &nbsp;|&nbsp; ${dateStr || ""}</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Standard</th>
+        <th class="w-status">Meets</th>
+        <th class="w-comments">Comments</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${checklistRows}
+      ${immunRow}
+    </tbody>
+  </table>
+  <div class="footer">All About Childcare Health, LTD &nbsp;·&nbsp; Nurse Visit Sheet &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString()}</div>
+</div>
+
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 800);
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function NurseVisitSheet() {
+  const [mode, setMode] = useState("intake"); // "intake" | "wizard"
+  const [step, setStep] = useState(0);
+  const [formData, setFormData] = useState({});
+  const [checklistData, setChecklistData] = useState({});
+  const [commentData, setCommentData] = useState({});
+  const [showReview, setShowReview] = useState(false);
+  const topRef = useRef(null);
+
+  const totalSteps = SECTIONS.length;
+  const section = SECTIONS[step];
+  const progress = ((step) / totalSteps) * 100;
+
+  function scrollTop() {
+    topRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function next() {
+    if (step < totalSteps - 1) { setStep(step + 1); scrollTop(); }
+    else setShowReview(true);
+  }
+  function prev() {
+    if (showReview) { setShowReview(false); return; }
+    if (step > 0) { setStep(step - 1); scrollTop(); }
+  }
+
+  function updateField(id, value) {
+    setFormData((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function updateChecklist(id) {
+    setChecklistData((prev) => ({ ...prev, [id]: cycleStatus(prev[id]) }));
+  }
+
+  function sectionComplete(s) {
+    if (s.type === "header") return !!formData.centerName;
+    if (s.type === "checklist") return s.items.every((i) => checklistData[i.id]);
+    return true;
+  }
+
+  function launchWizard(fd, cd) {
+    setFormData(fd || {});
+    setChecklistData(cd || {});
+    setStep(0);
+    setShowReview(false);
+    setMode("wizard");
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }
+
+  // ── Render ──
+  if (mode === "intake") {
+    return <IntakeScreen onLaunch={launchWizard} topRef={topRef} />;
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(160deg, #0f3460 0%, #16213e 60%, #0d1b2a 100%)",
+      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+      padding: "0 0 60px 0",
+    }}>
+      {/* Header */}
+      <div ref={topRef} style={{
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(12px)",
+        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        padding: "16px 20px 12px",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              All About Childcare Health
+            </div>
+            <div style={{ color: "white", fontSize: 16, fontWeight: 700, marginTop: 2 }}>
+              Nurse Visit Sheet
+            </div>
+          </div>
+          <div style={{ color: "#94a3b8", fontSize: 12 }}>
+            {showReview ? "Review" : `${step + 1} / ${totalSteps}`}
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{ marginTop: 10, height: 3, background: "rgba(255,255,255,0.1)", borderRadius: 2 }}>
+          <div style={{
+            height: "100%",
+            width: `${showReview ? 100 : progress}%`,
+            background: "linear-gradient(90deg, #38bdf8, #34d399)",
+            borderRadius: 2,
+            transition: "width 0.4s ease",
+          }} />
+        </div>
+        {/* Step dots */}
+        <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+          {SECTIONS.map((s, i) => (
+            <button key={s.id} onClick={() => { setShowReview(false); setStep(i); scrollTop(); }}
+              style={{
+                width: 8, height: 8, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0,
+                background: i === step && !showReview ? "#38bdf8" : sectionComplete(s) ? "#34d399" : "rgba(255,255,255,0.2)",
+                transition: "all 0.2s",
+              }} />
+          ))}
+          <button onClick={() => setShowReview(true)}
+            style={{
+              width: 8, height: 8, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0,
+              background: showReview ? "#f59e0b" : "rgba(255,255,255,0.1)",
+            }} />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: "20px 16px", maxWidth: 600, margin: "0 auto" }}>
+        {showReview ? (
+          <ReviewScreen
+            formData={formData} checklistData={checklistData}
+            onEdit={(i) => { setShowReview(false); setStep(i); scrollTop(); }}
+            onGenerate={() => { generatePDF(formData, checklistData); saveVisitToSupabase(formData, checklistData); }}
+          />
+        ) : (
+          <SectionForm
+            section={section}
+            formData={formData}
+            checklistData={checklistData}
+            commentData={commentData}
+            onField={updateField}
+            onChecklist={updateChecklist}
+          />
+        )}
+      </div>
+
+      {/* Nav */}
+      {!showReview && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          padding: "12px 16px",
+          background: "rgba(15,52,96,0.95)",
+          backdropFilter: "blur(16px)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", gap: 10,
+        }}>
+          {step > 0 && (
+            <button onClick={prev} style={{
+              flex: 1, padding: "13px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.15)",
+              background: "transparent", color: "#94a3b8", fontWeight: 600, fontSize: 14, cursor: "pointer",
+            }}>← Back</button>
+          )}
+          <button onClick={next} style={{
+            flex: 2, padding: "13px", borderRadius: 10, border: "none",
+            background: "linear-gradient(135deg, #0ea5e9, #38bdf8)",
+            color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer",
+            boxShadow: "0 4px 20px rgba(14,165,233,0.35)",
+          }}>
+            {step === totalSteps - 1 ? "Review →" : "Next →"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Section Form ──────────────────────────────────────────────────────────────
+function SectionForm({ section, formData, checklistData, onField, onChecklist }) {
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>{section.icon}</div>
+        <div style={{ color: "white", fontSize: 20, fontWeight: 700 }}>{section.title}</div>
+        {section.code && (
+          <div style={{ color: "#64748b", fontSize: 11, marginTop: 3, fontWeight: 500 }}>Code: {section.code}</div>
+        )}
+      </div>
+
+      {section.type === "header" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {section.fields.map((f) => (
+            <FieldInput key={f.id} field={f} value={formData[f.id] || ""} onChange={(v) => onField(f.id, v)} />
+          ))}
+        </div>
+      )}
+
+      {section.type === "checklist" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{
+            background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.2)",
+            borderRadius: 8, padding: "8px 12px", marginBottom: 4,
+            color: "#7dd3fc", fontSize: 11, lineHeight: 1.5,
+          }}>
+            Tap any item to cycle: <strong>Direct → Evidence → Not Observed → N/A → unset</strong>
+          </div>
+          {section.items.map((item) => (
+            <ChecklistItem
+              key={item.id} item={item}
+              value={checklistData[item.id]}
+              onTap={() => onChecklist(item.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {section.type === "immunization" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {section.fields.map((f) => (
+            <FieldInput key={f.id} field={f} value={formData[f.id] || ""} onChange={(v) => onField(f.id, v)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Field Input ───────────────────────────────────────────────────────────────
+function FieldInput({ field, value, onChange }) {
+  const base = {
+    width: "100%", padding: "12px 14px", borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.06)", color: "white",
+    fontSize: 15, outline: "none",
+    fontFamily: "inherit",
+  };
+
+  if (field.type === "checkbox") {
+    return (
+      <div onClick={() => onChange(!value)} style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 12, cursor: "pointer",
+        background: value ? "rgba(56,189,248,0.08)" : "rgba(255,255,255,0.03)",
+        border: `1px solid ${value ? "rgba(56,189,248,0.3)" : "rgba(255,255,255,0.08)"}`,
+        borderRadius: 10, padding: "12px 14px",
+        transition: "all 0.2s",
+      }}>
+        <span style={{ color: value ? "#e2e8f0" : "#94a3b8", fontSize: 14, lineHeight: 1.4, flex: 1 }}>
+          {field.label}
+        </span>
+        {/* Toggle pill */}
+        <div style={{
+          width: 46, height: 26, borderRadius: 13, flexShrink: 0,
+          background: value ? "#0ea5e9" : "rgba(255,255,255,0.12)",
+          position: "relative", transition: "background 0.2s",
+          boxShadow: value ? "0 0 10px rgba(14,165,233,0.4)" : "none",
+        }}>
+          <div style={{
+            position: "absolute", top: 3, left: value ? 23 : 3,
+            width: 20, height: 20, borderRadius: "50%",
+            background: "white", transition: "left 0.2s",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+          }} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+        {field.label}
+      </div>
+      {field.type === "textarea" ? (
+        <textarea rows={5} value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter notes here..."
+          style={{ ...base, resize: "vertical", lineHeight: 1.6 }} />
+      ) : (
+        <input type={field.type || "text"} value={value} onChange={(e) => onChange(e.target.value)}
+          style={base} />
+      )}
+    </div>
+  );
+}
+
+// ── Checklist Item ────────────────────────────────────────────────────────────
+function ChecklistItem({ item, value, onTap }) {
+  const style = getStatusStyle(value);
+  const label = getStatusLabel(value);
+  const hasValue = !!value;
+
+  return (
+    <div onClick={onTap} style={{
+      background: hasValue ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+      border: hasValue ? "1px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.07)",
+      borderRadius: 10, padding: "12px 14px",
+      cursor: "pointer", transition: "all 0.15s",
+      display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10,
+    }}>
+      <div style={{ color: hasValue ? "#e2e8f0" : "#94a3b8", fontSize: 13, lineHeight: 1.5, flex: 1 }}>
+        {item.label}
+        {item.code && <span style={{ color: "#475569", fontSize: 11, marginLeft: 6 }}>{item.code}</span>}
+      </div>
+      <div style={{
+        ...style,
+        borderRadius: 6, padding: "3px 8px", fontSize: 10.5, fontWeight: 700,
+        whiteSpace: "nowrap", flexShrink: 0, marginTop: 1,
+        transition: "all 0.15s",
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+// ── Review Screen ─────────────────────────────────────────────────────────────
+function ReviewScreen({ formData, checklistData, onEdit, onGenerate }) {
+  const incomplete = SECTIONS.filter((s) => {
+    if (s.type === "checklist") return s.items.some((i) => !checklistData[i.id]);
+    return false;
+  });
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
+        <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>Review & Export</div>
+        <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
+          Check your entries, then generate the PDF.
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+        {SECTIONS.map((s, i) => {
+          const done = s.type === "checklist"
+            ? s.items.filter((it) => checklistData[it.id]).length
+            : null;
+          const total = s.type === "checklist" ? s.items.length : null;
+
+          return (
+            <div key={s.id} onClick={() => onEdit(i)} style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 10, padding: "12px 14px",
+              cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 18 }}>{s.icon}</span>
+                <span style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>{s.title}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {total !== null && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: done === total ? "#34d399" : "#f59e0b",
+                  }}>
+                    {done}/{total}
+                  </span>
+                )}
+                <span style={{ color: "#475569", fontSize: 12 }}>Edit →</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Visit info summary */}
+      {formData.centerName && (
+        <div style={{
+          background: "rgba(56,189,248,0.07)", border: "1px solid rgba(56,189,248,0.2)",
+          borderRadius: 10, padding: "14px 16px", marginBottom: 20,
+        }}>
+          <div style={{ color: "#7dd3fc", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            Visit Summary
+          </div>
+          <div style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.8 }}>
+            <strong style={{ color: "white" }}>Center:</strong> {formData.centerName}<br />
+            {formData.date && <><strong style={{ color: "white" }}>Date:</strong> {formData.date}<br /></>}
+            {formData.time && <><strong style={{ color: "white" }}>Time:</strong> {formData.time}<br /></>}
+            {formData.metWithDirector && <><strong style={{ color: "white" }}>Director:</strong> {formData.metWithDirector}</>}
+          </div>
+        </div>
+      )}
+
+      {incomplete.length > 0 && (
+        <div style={{
+          background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)",
+          borderRadius: 10, padding: "12px 14px", marginBottom: 20,
+          color: "#fbbf24", fontSize: 12,
+        }}>
+          ⚠️ {incomplete.length} section(s) have unset items. You can still generate — they'll show as blank.
+        </div>
+      )}
+
+      {/* Generate button */}
+      <button onClick={onGenerate} style={{
+        width: "100%", padding: "16px", borderRadius: 12, border: "none",
+        background: "linear-gradient(135deg, #0ea5e9, #34d399)",
+        color: "white", fontWeight: 800, fontSize: 16, cursor: "pointer",
+        boxShadow: "0 6px 30px rgba(14,165,233,0.4)",
+        letterSpacing: "0.02em",
+      }}>
+        Generate PDF 📄
+      </button>
+      <div style={{ color: "#475569", fontSize: 11, textAlign: "center", marginTop: 8 }}>
+        Opens print dialog — save as PDF from there
+      </div>
+    </div>
+  );
+}
+
+// ── Local narrative parser (fallback when API is unavailable) ─────────────────
+function parseNarrativeLocally(text) {
+  const t = text.toLowerCase();
+  const has = (...words) => words.some(w => t.includes(w));
+  const status = (pos, neg) => {
+    if (has(...(neg||[]))) return "not_observed";
+    if (has(...pos)) return "direct";
+    return null;
+  };
+
+  // Extract center name — look for patterns like "visited X" or "at X center/childcare"
+  const centerMatch = text.match(/visited\s+([A-Z][\w\s]+?)(?:\s+on|\s+at|\s*,|\.|$)/i)
+    || text.match(/([A-Z][\w\s]+(?:Center|Childcare|Care|Academy|School|Daycare))/i);
+  const centerName = centerMatch ? centerMatch[1].trim() : "";
+
+  // Extract date
+  const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})|(?:(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?[,\s]+(\d{4}))/i);
+  let date = "";
+  if (dateMatch) {
+    if (dateMatch[1]) date = dateMatch[1];
+  }
+
+  // Extract time
+  const timeMatch = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+  let time = "";
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1]);
+    const m = timeMatch[2] || "00";
+    if (timeMatch[3].toLowerCase() === "pm" && h < 12) h += 12;
+    if (timeMatch[3].toLowerCase() === "am" && h === 12) h = 0;
+    time = String(h).padStart(2,"0") + ":" + m;
+  }
+
+  const inf = text.match(/(\d+)\s*infant/i);
+  const tod = text.match(/(\d+)\s*toddler/i);
+  const o18 = text.match(/(\d+)\s*over\s*18/i);
+  const mix = text.match(/(\d+)\s*mixed/i);
+
+  return {
+    formData: {
+      centerName,
+      time,
+      date,
+      metWithDirector: has("met with director","spoke with director","director was present","met the director"),
+      visitOpenRooms: has("visited room","open room","walked through","toured","visited the room"),
+      educationNewsletter: has("newsletter","provided education","education newsletter"),
+      notes: text,
+      imm_infant: inf ? inf[1] : "",
+      imm_toddler: tod ? tod[1] : "",
+      imm_over18: o18 ? o18[1] : "",
+      imm_mixed: mix ? mix[1] : "",
+      imm_letters: has("letters to parent","omission letter","sent letters"),
+    },
+    checklistData: {
+      hw_technique: status(["hand wash","washing hands","wash hands","handwash"],["not washing","didn't wash","no hand wash"]),
+      hw_frequency: status(["washing frequently","wash after","hand hygiene"],["not washing","skipping"]),
+      hw_supplies: status(["soap","paper towel","disposable towel","hand wash sink"],["no soap","no towel","missing supplies"]),
+      dc_supplies: status(["diaper supplies","wipes","diaper area"],["no supplies","missing diaper"]),
+      dc_impervious: status(["impervious","changing table","waterproof surface"],["not impervious"]),
+      dc_gloves: status(["gloves","latex glove"],["no gloves","without gloves"]),
+      dc_discard: status(["covered container","trash","disposed","discarded"],["left out","not disposed"]),
+      dc_wash: status(["washed hands after","hands washed","wash after diaper"],["didn't wash"]),
+      dc_sanitize: status(["sanitized","cleaned surface","wiped down"],["not sanitized","not cleaned"]),
+      dc_posted: status(["procedure posted","posted","sign","instructions posted"],["not posted"]),
+      disc_positive: status(["positive guidance","positive discipline","redirection","developmentally appropriate"],["yelling","harsh","punish"]),
+      disc_noprohibited: status(["no prohibited","appropriate discipline","positive only"],["yelling","hit","humiliat","shame","emotional abuse","physical punishment"]),
+      med_policy: status(["medication policy","med policy","policy present","policy posted"],["no policy","missing policy"]),
+      med_locked: status(["locked","secure","cabinet","locked medication"],["unlocked","accessible","not locked"]),
+      med_labeled: status(["labeled","label","properly labeled"],["unlabeled","not labeled"]),
+      med_expiration: status(["not expired","current","valid","expiration checked"],["expired"]),
+      med_log: status(["medication log","med log","documented","log"],["no log","not documented"]),
+      med_permission: status(["permission","authorization","parent permission"],["no permission","unauthorized"]),
+      if_labeled: status(["bottle labeled","labeled bottle","dated bottle"],["unlabeled bottle"]),
+      if_nomicrowave: status(["no microwave","not microwaved"],["microwave"]),
+      if_nopropping: status(["no propping","not propped"],["propped bottle","propping"]),
+      food_servings: status(["age appropriate","appropriate serving","right portion"],["inappropriate","too much","too little"]),
+      food_choking: status(["choking","cut","appropriate size","bite size"],["choking hazard"]),
+      food_nutrition: status(["nutrition","balanced","healthy","meal plan"],["unhealthy","poor nutrition"]),
+      gs_supervision: status(["supervised","adequate supervision","staff ratio","watching"],["unsupervised","no supervision","left alone"]),
+      gs_cleanliness: status(["clean","tidy","organized","neat","sanitary"],["dirty","messy","unclean","filthy"]),
+      ss_spacing: status(["spacing","2 feet","crib spacing","distance between crib"],["too close","no spacing"]),
+      ss_mattress: status(["tight mattress","firm mattress","not drop side","fixed side"],["drop side","loose mattress"]),
+      ss_cribonly: status(["crib only","sleep in crib","not in swing","not in car seat"],["swing","car seat","bouncer"]),
+      ss_back: status(["back to sleep","on back","supine"],["stomach","side sleep","on tummy"]),
+      ss_nothing: status(["nothing in crib","empty crib","just sheet","just pacifier"],["blanket in crib","stuffed animal","pillow in crib"]),
+      ss_observed: status(["can be seen","visible","observable","staff can see","line of sight"],["can't see","not visible","hidden"]),
+      pg_clean: status(["playground clean","clean playground","no debris"],["dirty playground","debris"]),
+      pg_surface: status(["appropriate surface","safe surface","rubber","mulch","soft surface"],["hard surface","concrete","unsafe"]),
+      pg_maintained: status(["maintained","good condition","no damage","well kept"],["broken","damaged","needs repair"]),
+      pg_sandbox: status(["covered sandbox","sandbox covered","sandbox lid"],["uncovered sandbox","open sandbox"]),
+      toy_mouthed: status(["mouthed toys","toys cleaned","sanitized toys","toys sanitized"],["not cleaned","dirty toys"]),
+      em_action: status(["action plan","allergy plan","special needs plan"],["no action plan","missing plan"]),
+      em_phone: status(["emergency number","phone number","emergency contact"],["no number","missing number"]),
+      em_evacuation: status(["evacuation plan","fire plan","emergency plan","evacuation posted"],["no evacuation","missing evacuation"]),
+      em_firstaid: status(["first aid","first-aid","aid kit","aid box"],["no first aid","missing first aid","not stocked"]),
+      em_poison: status(["poison control","911","emergency numbers posted"],["no poison","missing 911"]),
+      em_choking: status(["choking poster","heimlich","first aid posted","cpr posted"],["no choking","not posted"]),
+      em_isolation: status(["isolation area","sick room","isolation space","separate area for ill"],["no isolation","no sick room"]),
+    }
+  };
+}
+
+
+// ── Intake Screen ─────────────────────────────────────────────────────────────
+function IntakeScreen({ onLaunch, topRef }) {
+  const [narrative, setNarrative] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+  const [parsed, setParsed] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [debugLog, setDebugLog] = useState("");
+
+  const SYSTEM_PROMPT = `You are a nurse visit form assistant. The user will describe a childcare center visit in plain language. 
+Extract structured data and return ONLY a valid JSON object with no preamble, explanation, or markdown fences.
+
+The JSON must have exactly these keys:
+
+formData: {
+  centerName: string,
+  time: string (HH:MM 24h or ""),
+  date: string (YYYY-MM-DD or ""),
+  metWithDirector: boolean,
+  visitOpenRooms: boolean,
+  educationNewsletter: boolean,
+  notes: string,
+  imm_infant: string (number or ""),
+  imm_toddler: string (number or ""),
+  imm_over18: string (number or ""),
+  imm_mixed: string (number or ""),
+  imm_letters: boolean
+}
+
+checklistData: {
+  hw_technique: one of "direct"|"evidence"|"not_observed"|"na"|null,
+  hw_frequency: one of above or null,
+  hw_supplies: one of above or null,
+  dc_supplies: one of above or null,
+  dc_impervious: one of above or null,
+  dc_gloves: one of above or null,
+  dc_discard: one of above or null,
+  dc_wash: one of above or null,
+  dc_sanitize: one of above or null,
+  dc_posted: one of above or null,
+  disc_positive: one of above or null,
+  disc_noprohibited: one of above or null,
+  med_policy: one of above or null,
+  med_locked: one of above or null,
+  med_labeled: one of above or null,
+  med_expiration: one of above or null,
+  med_log: one of above or null,
+  med_permission: one of above or null,
+  if_labeled: one of above or null,
+  if_nomicrowave: one of above or null,
+  if_nopropping: one of above or null,
+  food_servings: one of above or null,
+  food_choking: one of above or null,
+  food_nutrition: one of above or null,
+  gs_supervision: one of above or null,
+  gs_cleanliness: one of above or null,
+  ss_spacing: one of above or null,
+  ss_mattress: one of above or null,
+  ss_cribonly: one of above or null,
+  ss_back: one of above or null,
+  ss_nothing: one of above or null,
+  ss_observed: one of above or null,
+  pg_clean: one of above or null,
+  pg_surface: one of above or null,
+  pg_maintained: one of above or null,
+  pg_sandbox: one of above or null,
+  toy_mouthed: one of above or null,
+  em_action: one of above or null,
+  em_phone: one of above or null,
+  em_evacuation: one of above or null,
+  em_firstaid: one of above or null,
+  em_poison: one of above or null,
+  em_choking: one of above or null,
+  em_isolation: one of above or null
+}
+
+Rules:
+- If something is described as observed directly or seen happening, use "direct"
+- If there is posted evidence, documents, records, or signs, use "evidence"  
+- If something was not seen or not checked, use "not_observed"
+- If something doesn't apply (e.g. sandbox for an indoor-only center), use "na"
+- If the narrative gives no information about an item, use null
+- Be generous in inferring: if nurse says "everything looked good" apply "direct" broadly
+- Extract center name, time, date from the narrative where mentioned`;
+
+  async function handleAnalyze() {
+    if (!narrative.trim()) return;
+    setStatus("loading");
+    setErrorMsg("");
+    setDebugLog("");
+
+    try {
+      const prompt = SYSTEM_PROMPT + "\n\nHere is the nurse visit narrative:\n\n" + narrative + "\n\nReturn ONLY the JSON object, no explanation, no markdown.";
+
+      // Use the artifact-provided fetch which proxies to Anthropic API
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      let rawText = "";
+      let data = null;
+
+      try {
+        rawText = await response.text();
+      } catch(fetchErr) {
+        // Sandbox blocked the fetch — fall back to parseNarrativeLocally
+        const local = parseNarrativeLocally(narrative);
+        setParsed(local);
+        setDebugLog("Fetch blocked by sandbox — used local parser");
+        setStatus("done");
+        return;
+      }
+
+      setDebugLog("HTTP " + response.status + " | " + rawText.slice(0, 500));
+
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status + ": " + rawText.slice(0, 300));
+      }
+
+      try { data = JSON.parse(rawText); } catch(e) {
+        throw new Error("Response not JSON: " + rawText.slice(0, 200));
+      }
+      const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+      if (!text) throw new Error("No text content in API response");
+
+      // Brace-depth JSON extraction
+      let depth = 0, jsonStart = -1, jsonStr = "";
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] === "{") { if (depth === 0) jsonStart = i; depth++; }
+        else if (text[i] === "}") { depth--; if (depth === 0 && jsonStart !== -1) { jsonStr = text.slice(jsonStart, i + 1); break; } }
+      }
+      if (!jsonStr) throw new Error("No JSON object found in: " + text.slice(0, 200));
+
+      const result = JSON.parse(jsonStr);
+      if (!result.formData) result.formData = {};
+      if (!result.checklistData) result.checklistData = {};
+
+      setParsed(result);
+      setStatus("done");
+    } catch (err) {
+      // If network/sandbox blocked, fall back to local keyword parser
+      const errStr = String(err.message || err);
+      if (errStr.includes("Invalid response") || errStr.includes("fetch") || errStr.includes("network") || errStr.includes("Failed")) {
+        try {
+          const local = parseNarrativeLocally(narrative);
+          setParsed(local);
+          setDebugLog("API unavailable — used local keyword parser");
+          setStatus("done");
+          return;
+        } catch(localErr) { /* fall through to error state */ }
+      }
+      setStatus("error");
+      setErrorMsg(errStr);
+    }
+  }
+  function handleContinue() {
+    onLaunch(parsed.formData, parsed.checklistData);
+  }
+
+  function handleSkip() {
+    onLaunch({}, {});
+  }
+
+  const charCount = narrative.length;
+
+  return (
+    <div ref={topRef} style={{
+      minHeight: "100vh",
+      background: "linear-gradient(160deg, #0f3460 0%, #16213e 60%, #0d1b2a 100%)",
+      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+      display: "flex", flexDirection: "column",
+    }}>
+      {/* Header */}
+      <div style={{
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(12px)",
+        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        padding: "16px 20px 14px",
+      }}>
+        <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          All About Childcare Health
+        </div>
+        <div style={{ color: "white", fontSize: 17, fontWeight: 700, marginTop: 2 }}>
+          Nurse Visit Sheet
+        </div>
+      </div>
+
+      <div style={{ padding: "24px 18px", maxWidth: 600, margin: "0 auto", width: "100%", flex: 1, display: "flex", flexDirection: "column" }}>
+
+        {status === "idle" && (
+          <>
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>✍️</div>
+              <div style={{ color: "white", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                Describe your visit
+              </div>
+              <div style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>
+                Write what you remember in your own words — center name, what you observed, any issues, who you met with. The AI will pre-fill the entire form for you.
+              </div>
+            </div>
+
+            <div style={{
+              background: "rgba(56,189,248,0.06)",
+              border: "1px solid rgba(56,189,248,0.18)",
+              borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+              color: "#7dd3fc", fontSize: 11.5, lineHeight: 1.6,
+            }}>
+              💡 <strong>Example:</strong> "Visited Sunshine Center on April 5th at 10am. Met with director Maria. Staff were washing hands correctly, saw posted procedures in the diaper area, medications were locked. Cribs had proper spacing. First aid kit was stocked. Reviewed 6 infant files and 4 toddler files."
+            </div>
+
+            <textarea
+              value={narrative}
+              onChange={e => setNarrative(e.target.value)}
+              placeholder="Start typing your visit narrative here..."
+              rows={10}
+              style={{
+                width: "100%", borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.06)", color: "white",
+                fontSize: 15, outline: "none", fontFamily: "inherit",
+                resize: "vertical", lineHeight: 1.7, padding: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ color: "#475569", fontSize: 11, textAlign: "right", marginTop: 5 }}>
+              {charCount} characters
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={handleSkip} style={{
+                flex: 1, padding: "13px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "transparent", color: "#64748b",
+                fontWeight: 600, fontSize: 13, cursor: "pointer",
+              }}>
+                Skip — fill manually
+              </button>
+              <button
+                onClick={handleAnalyze}
+                disabled={!narrative.trim()}
+                style={{
+                  flex: 2, padding: "13px", borderRadius: 10, border: "none",
+                  background: narrative.trim()
+                    ? "linear-gradient(135deg, #0ea5e9, #38bdf8)"
+                    : "rgba(255,255,255,0.08)",
+                  color: narrative.trim() ? "white" : "#475569",
+                  fontWeight: 700, fontSize: 15, cursor: narrative.trim() ? "pointer" : "default",
+                  boxShadow: narrative.trim() ? "0 4px 20px rgba(14,165,233,0.35)" : "none",
+                  transition: "all 0.2s",
+                }}>
+                Analyze & Pre-fill ✨
+              </button>
+            </div>
+          </>
+        )}
+
+        {status === "loading" && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, paddingTop: 60 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: "50%",
+              border: "3px solid rgba(56,189,248,0.2)",
+              borderTop: "3px solid #38bdf8",
+              animation: "spin 0.9s linear infinite",
+            }} />
+            <div style={{ color: "white", fontSize: 16, fontWeight: 600 }}>Analyzing your visit...</div>
+            <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", maxWidth: 260 }}>
+              Reading your narrative and mapping it to all form fields
+            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
+        {status === "done" && parsed && (
+          <>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>✅</div>
+              <div style={{ color: "white", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                Form pre-filled!
+              </div>
+              <div style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>
+                The AI has mapped your narrative to the form. Review and confirm below, then step through to verify each section.
+              </div>
+            </div>
+
+            {/* Summary of what was extracted */}
+            <div style={{
+              background: "rgba(52,211,153,0.07)",
+              border: "1px solid rgba(52,211,153,0.2)",
+              borderRadius: 12, padding: "14px 16px", marginBottom: 16,
+            }}>
+              <div style={{ color: "#34d399", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                Extracted Info
+              </div>
+              {parsed.formData.centerName && (
+                <Row label="Center" value={parsed.formData.centerName} />
+              )}
+              {parsed.formData.date && (
+                <Row label="Date" value={parsed.formData.date} />
+              )}
+              {parsed.formData.time && (
+                <Row label="Time" value={parsed.formData.time} />
+              )}
+              <Row label="Met Director" value={parsed.formData.metWithDirector ? "Yes" : "No"} />
+              <Row label="Visited Rooms" value={parsed.formData.visitOpenRooms ? "Yes" : "No"} />
+              <Row
+                label="Checklist items filled"
+                value={`${Object.values(parsed.checklistData).filter(Boolean).length} / ${Object.keys(parsed.checklistData).length}`}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStatus("idle")} style={{
+                flex: 1, padding: "13px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "transparent", color: "#64748b",
+                fontWeight: 600, fontSize: 13, cursor: "pointer",
+              }}>
+                ← Re-write
+              </button>
+              <button onClick={handleContinue} style={{
+                flex: 2, padding: "13px", borderRadius: 10, border: "none",
+                background: "linear-gradient(135deg, #0ea5e9, #34d399)",
+                color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer",
+                boxShadow: "0 4px 20px rgba(14,165,233,0.35)",
+              }}>
+                Review & Edit Form →
+              </button>
+            </div>
+          </>
+        )}
+
+        {status === "error" && (
+          <>
+            <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12, padding: "12px 14px", background: "rgba(248,113,113,0.08)", borderRadius: 10, border: "1px solid rgba(248,113,113,0.2)", lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>⚠️ Error</div>
+              <div style={{ wordBreak: "break-word" }}>{errorMsg}</div>
+            </div>
+            {debugLog && (
+              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 12, padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 8, fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>
+                <div style={{ color: "#475569", marginBottom: 4, fontFamily: "sans-serif", fontWeight: 600 }}>Debug log:</div>
+                {debugLog}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setStatus("idle")} style={{
+                flex: 1, padding: "13px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)",
+                background: "transparent", color: "#94a3b8", fontWeight: 600, fontSize: 14, cursor: "pointer",
+              }}>← Try again</button>
+              <button onClick={() => onLaunch({}, {})} style={{
+                flex: 1, padding: "13px", borderRadius: 10, border: "none",
+                background: "rgba(255,255,255,0.08)", color: "#94a3b8", fontWeight: 600, fontSize: 13, cursor: "pointer",
+              }}>Fill manually →</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+      <span style={{ color: "#94a3b8", fontSize: 12 }}>{label}</span>
+      <span style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}
+
+
+    // Mount app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(NurseVisitSheet));
+  </script>
+
+  <!-- PWA service worker registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
